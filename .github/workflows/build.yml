@@ -1,0 +1,46 @@
+name: Build JeevVPN APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter --version
+
+      - name: Generate Android scaffold, keep our code
+        run: |
+          mkdir -p /tmp/keep
+          cp -r pubspec.yaml lib /tmp/keep/
+          flutter create --platforms=android --org com.jeevvpn --project-name jeevvpn .
+          cp -f /tmp/keep/pubspec.yaml pubspec.yaml
+          rm -rf lib && cp -r /tmp/keep/lib lib
+          sed -i 's/android:label="jeevvpn"/android:label="JeevVPN"/' android/app/src/main/AndroidManifest.xml
+
+      - run: flutter pub get
+
+      - name: Build APK (debug — installable)
+        run: flutter build apk --debug
+
+      - name: Rename
+        run: cp build/app/outputs/flutter-apk/app-debug.apk JeevVPN.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JeevVPN-apk
+          path: JeevVPN.apk
+          if-no-files-found: error
