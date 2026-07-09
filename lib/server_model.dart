@@ -1,16 +1,19 @@
-/// A JeevVPN location. Holds everything the UI needs today plus the
-/// connection coordinates the real tunnel engine will use in v3.
+/// A JeevVPN location. Holds everything the UI needs plus the real tunnel
+/// share-link the v3 engine (flutter_v2ray / Xray) connects with.
 class ServerModel {
   final String id;
   final String name; // e.g. "India", "Korea Central"
-  final String country; // e.g. "India"
-  final String city; // e.g. "Pune"
+  final String country;
+  final String city;
   final String flag;
 
-  // Tunnel coordinates (used by the real engine in v3; connect is simulated now).
   final String host;
   final int port;
   final String protocol;
+
+  /// v3 real-tunnel config as a share link (trojan://...). Empty until the
+  /// node has a real endpoint provisioned — those stay a simulated preview.
+  final String shareLink;
 
   final bool recommended;
   final bool online;
@@ -25,7 +28,8 @@ class ServerModel {
     required this.flag,
     required this.host,
     this.port = 443,
-    this.protocol = 'HTTPS · TLS 443',
+    this.protocol = 'Trojan · TLS 443',
+    this.shareLink = '',
     this.recommended = false,
     this.online = true,
     required this.ping,
@@ -34,15 +38,15 @@ class ServerModel {
 
   String get location => '$city · $country';
 
-  /// True once we have real tunnel coordinates for this node (v3).
-  bool get hasEndpoint => host.isNotEmpty;
+  /// True once this node can carry a real device-wide tunnel (v3).
+  bool get canTunnel => shareLink.isNotEmpty;
 }
 
 /// The live JeevVPN fleet.
 ///
-/// India (Pune) is the real, working node (52.140.121.205 → the sslip.io TLS
-/// front). Korea Central is provisioned on Azure; its tunnel host is filled in
-/// once we have the endpoint — connect is simulated until v3 either way.
+/// India (Pune) is fully real: sing-box Trojan-over-TLS on 443 (52.140.121.205),
+/// connected via the share link below. Korea Central is provisioned on Azure but
+/// has no tunnel endpoint yet, so it stays a simulated preview until set up.
 const List<ServerModel> kServers = [
   ServerModel(
     id: 'in-pune',
@@ -52,6 +56,8 @@ const List<ServerModel> kServers = [
     flag: '🇮🇳',
     host: '52-140-121-205.sslip.io',
     port: 443,
+    shareLink:
+        'trojan://2f787001ba855030db138fbaca39840c@52-140-121-205.sslip.io:443?security=tls&sni=52-140-121-205.sslip.io&type=tcp#JeevVPN-India',
     recommended: true,
     online: true,
     ping: 16,
@@ -63,7 +69,7 @@ const List<ServerModel> kServers = [
     country: 'South Korea',
     city: 'Seoul',
     flag: '🇰🇷',
-    host: '', // TODO(v3): Azure Korea Central tunnel endpoint
+    host: '', // TODO(v3): provision Trojan on the Korea VM, then add shareLink
     port: 443,
     recommended: false,
     online: true,

@@ -65,6 +65,15 @@ class HomeScreen extends StatelessWidget {
                   : 'Tap the orb to connect',
               style: TextStyle(color: c.sub, fontSize: 13)),
         ),
+        if (vpn.errorText != null && status == VpnStatus.disconnected)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: Text(vpn.errorText!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFFE5484D), fontSize: 12.5)),
+            ),
+          ),
         const SizedBox(height: 18),
         FadeSlideIn(
           delayMs: 60,
