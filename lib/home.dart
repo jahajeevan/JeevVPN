@@ -1,0 +1,277 @@
+import 'package:flutter/material.dart';
+import 'theme.dart';
+import 'state.dart';
+import 'widgets.dart';
+import 'orb.dart';
+
+class HomeScreen extends StatelessWidget {
+  final VoidCallback onOpenServers;
+  final VoidCallback onOpenProfile;
+  const HomeScreen(
+      {super.key, required this.onOpenServers, required this.onOpenProfile});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final c = AppColors.of(context);
+    final status = app.status;
+    final statusText = switch (status) {
+      VpnStatus.connected => 'Protected',
+      VpnStatus.connecting => 'Securing your connection…',
+      VpnStatus.disconnected => 'Not connected',
+    };
+    final statusColor = switch (status) {
+      VpnStatus.connected => kGreenDeep,
+      VpnStatus.connecting => const Color(0xFFEAA23B),
+      VpnStatus.disconnected => c.sub,
+    };
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+      children: [
+        Row(children: [
+          const _BrandMark(),
+          const SizedBox(width: 10),
+          Text('JeevVPN', style: display(20, weight: FontWeight.w700, color: c.ink)),
+          const Spacer(),
+          _CircleIconButton(
+              icon: c.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              onTap: () => app.toggleThemeQuick(c.dark)),
+          const SizedBox(width: 8),
+          _CircleIconButton(icon: Icons.person_rounded, onTap: onOpenProfile),
+        ]),
+        const SizedBox(height: 14),
+        const Center(child: FadeSlideIn(child: ConnectOrb())),
+        const SizedBox(height: 8),
+        Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Text(statusText,
+                key: ValueKey(statusText),
+                textAlign: TextAlign.center,
+                style: display(24, weight: FontWeight.w700, color: statusColor)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Center(
+          child: Text(
+              status == VpnStatus.connected
+                  ? 'Tap the orb to disconnect'
+                  : 'Tap the orb to connect',
+              style: TextStyle(color: c.sub, fontSize: 13)),
+        ),
+        const SizedBox(height: 18),
+        FadeSlideIn(
+          delayMs: 60,
+          child: GlassCard(
+            blur: 14,
+            radius: 18,
+            onTap: onOpenServers,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(children: [
+              Text(app.server.flag, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Current location',
+                    style: TextStyle(fontSize: 11, color: c.faint)),
+                const SizedBox(height: 2),
+                Text('${app.server.city} · ${app.server.country}',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+              ]),
+              const Spacer(),
+              Text('Change',
+                  style: TextStyle(
+                      color: kGreenDeep,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12)),
+              Icon(Icons.chevron_right_rounded, color: c.faint),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 14),
+        FadeSlideIn(delayMs: 120, child: _LiveMetrics(app: app, c: c)),
+        const SizedBox(height: 14),
+        FadeSlideIn(
+          delayMs: 180,
+          child: Row(children: [
+            Expanded(
+                child: _StatTile(
+                    label: 'VPN IP',
+                    value: app.isConnected ? '52.140.121.205' : '—')),
+            const SizedBox(width: 12),
+            Expanded(
+                child: _StatTile(
+                    label: 'Session',
+                    value: app.isConnected ? app.clock : '00:00:00',
+                    monoFont: true)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: _StatTile(
+                    label: 'Ping',
+                    value: app.isConnected ? '${app.livePing} ms' : '—')),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveMetrics extends StatelessWidget {
+  final AppState app;
+  final AppColors c;
+  const _LiveMetrics({required this.app, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      blur: 14,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: app.isConnected ? _connected(context) : _idle(context),
+      ),
+    );
+  }
+
+  Widget _idle(BuildContext context) {
+    return Row(children: [
+      Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+            color: kGreen.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12)),
+        child: const Icon(Icons.shield_moon_rounded, color: kGreenDeep),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Stealth tunnel ready',
+              style: TextStyle(fontWeight: FontWeight.w700, color: c.ink)),
+          const SizedBox(height: 3),
+          Text('TLS-on-443 · beats DPI throttling',
+              style: TextStyle(color: c.sub, fontSize: 12.5)),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _connected(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        _rate(Icons.south_rounded, 'Download', app.downRate, kGreen),
+        const SizedBox(width: 10),
+        _rate(Icons.north_rounded, 'Upload', app.upRate, kAqua),
+      ]),
+      const SizedBox(height: 14),
+      Sparkline(data: app.spark, color: kGreen, height: 58),
+      const SizedBox(height: 10),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(
+            '${app.downMb.toStringAsFixed(1)} MB down · ${app.upMb.toStringAsFixed(1)} MB up',
+            style: TextStyle(color: c.sub, fontSize: 12)),
+        Row(children: [
+          Container(
+              width: 7,
+              height: 7,
+              decoration:
+                  const BoxDecoration(color: kGreen, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text('Live',
+              style: TextStyle(
+                  color: kGreenDeep,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12)),
+        ]),
+      ]),
+    ]);
+  }
+
+  Widget _rate(IconData icon, String label, double v, Color color) {
+    return Expanded(
+      child: Row(children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 8),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: TextStyle(fontSize: 11, color: c.faint)),
+          Text('${v.toStringAsFixed(1)} Mbps', style: mono(13, color: c.ink)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool monoFont;
+  const _StatTile(
+      {required this.label, required this.value, this.monoFont = false});
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return GlassCard(
+      radius: 16,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: TextStyle(fontSize: 11, color: c.faint)),
+        const SizedBox(height: 6),
+        Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: monoFont
+                ? mono(13, color: c.ink)
+                : TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: c.ink)),
+      ]),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [kMint, kGreenCore]),
+        borderRadius: BorderRadius.circular(11),
+        boxShadow: [
+          BoxShadow(
+              color: kGreenCore.withOpacity(0.5),
+              blurRadius: 12,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: const Icon(Icons.shield_rounded, size: 19, color: Colors.white),
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleIconButton({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return GlassCard(
+      radius: 12,
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: SizedBox(
+          width: 40, height: 40, child: Icon(icon, size: 19, color: c.sub)),
+    );
+  }
+}
