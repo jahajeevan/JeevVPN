@@ -4,8 +4,8 @@ A custom-built JeevVPN Android client (Flutter). Built in the cloud via GitHub A
 
 ## Roadmap
 - ✅ **v1 — custom UI shell**: JeevVPN home + connect orb, light/dark. *(connect was a UI preview)*
-- ✅ **v1.1 — UI overhaul**: multi-screen app (Home · Servers · Profile · Settings), custom-painted connect orb (orbiting particles, rotating sheen, pulse rings), animated aurora background, glass bottom-nav, live throughput sparkline, animated switches/segments. Includes an email→OTP sign-in flow **(visual preview — wires to Supabase in v2)**. *(connect is still simulated until v3)*
-- ⏳ **v2 — login**: real email-OTP sign-in with your JeevVPN (Supabase) account; admins + members, no in-app signup.
+- ✅ **v1.1 — UI overhaul**: multi-screen app (Home · Servers · Profile · Settings), custom-painted connect orb, animated aurora background, glass bottom-nav, live throughput sparkline, animated switches/segments.
+- ✅ **v2 — multi-server + real login**: two Azure locations (🇮🇳 India·Pune, 🇰🇷 Korea Central), anti-spam server switching (2 switches → 40s cooldown with live countdown), Recommended-Usage guidance, home "Current Server" card + duration + up/down indicators, and **real email-OTP sign in** (backend `/api/otp/*` on the Vercel app sends the code via Gmail SMTP — creds never ship in the APK). Service layer: `server_model.dart`, `server_manager.dart`, `vpn_service.dart`, `otp_service.dart`. *(connect is still simulated until v3)*
 - ⏳ **v3 — real VPN engine**: tap connect → tunnels all traffic through your server (no config import).
 
 ## Structure

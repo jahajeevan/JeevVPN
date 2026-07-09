@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme.dart';
 import 'state.dart';
+import 'vpn_service.dart';
 
 /// The hero connect control. Tapping it toggles the (simulated) tunnel.
 /// A single repeating controller drives every painted effect.
@@ -28,11 +29,11 @@ class _ConnectOrbState extends State<ConnectOrb>
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final status = app.status;
+    final status = app.vpn.status;
     return GestureDetector(
       onTap: () {
         if (app.haptics) HapticFeedback.mediumImpact();
-        app.toggle();
+        app.toggleConnection();
       },
       child: SizedBox(
         width: 280,

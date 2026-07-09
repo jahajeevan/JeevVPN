@@ -74,7 +74,7 @@ class _RootShellState extends State<RootShell> {
       extendBody: true,
       body: Stack(children: [
         Positioned.fill(
-            child: AuroraBackground(active: app.isConnected, dark: dark)),
+            child: AuroraBackground(active: app.vpn.isConnected, dark: dark)),
         Positioned.fill(child: IndexedStack(index: _tab, children: screens)),
       ]),
       bottomNavigationBar: GlassNavBar(index: _tab, onTap: _go),
