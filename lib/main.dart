@@ -8,6 +8,7 @@ import 'home.dart';
 import 'servers.dart';
 import 'profile.dart';
 import 'settings.dart';
+import 'login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,9 +44,63 @@ class _JeevVPNAppState extends State<JeevVPNApp> {
           themeMode: mode,
           theme: buildTheme(Brightness.light),
           darkTheme: buildTheme(Brightness.dark),
-          home: const RootShell(),
+          home: const AuthGate(),
         ),
       ),
+    );
+  }
+}
+
+/// Gates the app behind account creation / sign in. Shows a splash while the
+/// stored session loads, then the login screen or the app shell.
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final Widget child;
+    if (!app.authReady) {
+      child = const _Splash(key: ValueKey('splash'));
+    } else if (app.isSignedIn) {
+      child = const RootShell(key: ValueKey('shell'));
+    } else {
+      child = const LoginScreen(key: ValueKey('login'));
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 380),
+      child: child,
+    );
+  }
+}
+
+class _Splash extends StatelessWidget {
+  const _Splash({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Scaffold(
+      body: Stack(children: [
+        Positioned.fill(child: AuroraBackground(active: false, dark: c.dark)),
+        Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 66,
+              height: 66,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [kMint, kGreenCore]),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.shield_rounded, size: 34, color: Colors.white),
+            ),
+            const SizedBox(height: 18),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.4, color: kGreenCore),
+            ),
+          ]),
+        ),
+      ]),
     );
   }
 }

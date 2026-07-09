@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'server_manager.dart';
 import 'vpn_service.dart';
 
@@ -17,26 +18,51 @@ class AppState extends ChangeNotifier {
   bool protectedNotif = true;
   bool haptics = true;
 
-  // auth (set after a successful email-OTP verify)
+  // auth (set after a successful email-OTP verify, persisted across launches)
+  static const String _kEmailKey = 'jeev_signed_in_email';
   String? signedInEmail;
+  bool authReady = false; // true once the stored session has been loaded
   bool get isSignedIn => signedInEmail != null;
 
   AppState() {
     servers.addListener(notifyListeners);
     vpn.addListener(notifyListeners);
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_kEmailKey);
+      if (saved != null && saved.isNotEmpty) signedInEmail = saved;
+    } catch (_) {
+      // ignore — start signed out
+    }
+    authReady = true;
+    notifyListeners();
   }
 
   /// Connect / disconnect using the currently selected location.
   Future<void> toggleConnection() => vpn.toggle(servers.current);
 
-  void signIn(String email) {
+  Future<void> signIn(String email) async {
     signedInEmail = email.trim();
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kEmailKey, signedInEmail!);
+    } catch (_) {}
   }
 
-  void signOut() {
+  Future<void> signOut() async {
+    // Drop any live tunnel before returning to the gate.
+    if (vpn.status != VpnStatus.disconnected) vpn.disconnect();
     signedInEmail = null;
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kEmailKey);
+    } catch (_) {}
   }
 
   void setTheme(ThemeMode m) => themeMode.value = m;
