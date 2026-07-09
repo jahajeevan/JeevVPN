@@ -33,11 +33,11 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Build APK (debug — installable)
-        run: flutter build apk --debug
+      - name: Build APK (debug, per-ABI — smaller)
+        run: flutter build apk --debug --split-per-abi
 
-      - name: Rename
-        run: cp build/app/outputs/flutter-apk/app-debug.apk JeevVPN.apk
+      - name: Rename arm64 build
+        run: cp build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk JeevVPN.apk
 
       - uses: actions/upload-artifact@v4
         with:
