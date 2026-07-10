@@ -197,6 +197,15 @@ class VpnService extends ChangeNotifier {
         ],
       };
 
+      // Resolve names through a clean resolver inside the tunnel. The engine
+      // defaults to 8.8.8.8, which some ISPs hijack/poison — that alone can make
+      // pages fail to load even when the tunnel itself is up. Force Cloudflare
+      // first (queries ride the tunnel, so they don't leak or get tampered).
+      cfg['dns'] = {
+        'servers': ['1.1.1.1', '1.0.0.1', '8.8.8.8'],
+        'queryStrategy': 'UseIP',
+      };
+
       return jsonEncode(cfg);
     } catch (_) {
       // If the template changes shape, fall back to the raw config.
