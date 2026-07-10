@@ -28,13 +28,27 @@ class ProfileScreen extends StatelessWidget {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(signedIn ? 'Signed in' : 'Guest device',
+                      Text(
+                          signedIn
+                              ? (app.signedInName?.isNotEmpty == true
+                                  ? app.signedInName!
+                                  : 'Signed in')
+                              : 'Guest device',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
                               color: c.ink)),
                       const SizedBox(height: 3),
-                      Text(signedIn ? app.signedInEmail! : 'Not signed in',
+                      Text(
+                          signedIn
+                              ? [
+                                  app.signedInEmail!,
+                                  if (app.signedInAge != null)
+                                    'Age ${app.signedInAge}',
+                                ].join('  ·  ')
+                              : 'Not signed in',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: c.sub, fontSize: 13)),

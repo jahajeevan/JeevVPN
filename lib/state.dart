@@ -19,9 +19,13 @@ class AppState extends ChangeNotifier {
   bool protectedNotif = true;
   bool haptics = true;
 
-  // auth (set after a successful email-OTP verify, persisted across launches)
+  // auth (set after sign in / sign up, persisted across launches)
   static const String _kEmailKey = 'jeev_signed_in_email';
+  static const String _kNameKey = 'jeev_name';
+  static const String _kAgeKey = 'jeev_age';
   String? signedInEmail;
+  String? signedInName;
+  int? signedInAge;
   bool authReady = false; // true once the stored session has been loaded
   bool get isSignedIn => signedInEmail != null;
 
@@ -68,7 +72,11 @@ class AppState extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_kEmailKey);
-      if (saved != null && saved.isNotEmpty) signedInEmail = saved;
+      if (saved != null && saved.isNotEmpty) {
+        signedInEmail = saved;
+        signedInName = prefs.getString(_kNameKey);
+        signedInAge = prefs.getInt(_kAgeKey);
+      }
     } catch (_) {
       // ignore — start signed out
     }
@@ -79,12 +87,24 @@ class AppState extends ChangeNotifier {
   /// Connect / disconnect using the currently selected location.
   Future<void> toggleConnection() => vpn.toggle(servers.current);
 
-  Future<void> signIn(String email) async {
+  Future<void> signIn(String email, {String? name, int? age}) async {
     signedInEmail = email.trim();
+    signedInName = (name != null && name.trim().isNotEmpty) ? name.trim() : null;
+    signedInAge = age;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kEmailKey, signedInEmail!);
+      if (signedInName != null) {
+        await prefs.setString(_kNameKey, signedInName!);
+      } else {
+        await prefs.remove(_kNameKey);
+      }
+      if (signedInAge != null) {
+        await prefs.setInt(_kAgeKey, signedInAge!);
+      } else {
+        await prefs.remove(_kAgeKey);
+      }
     } catch (_) {}
   }
 
@@ -92,10 +112,14 @@ class AppState extends ChangeNotifier {
     // Drop any live tunnel before returning to the gate.
     if (vpn.status != VpnStatus.disconnected) vpn.disconnect();
     signedInEmail = null;
+    signedInName = null;
+    signedInAge = null;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kEmailKey);
+      await prefs.remove(_kNameKey);
+      await prefs.remove(_kAgeKey);
     } catch (_) {}
   }
 
