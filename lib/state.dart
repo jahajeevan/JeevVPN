@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'server_manager.dart';
 import 'vpn_service.dart';
+import 'update_service.dart';
 
 /// Top-level app state. Composes the [ServerManager] and [VpnService] services
 /// (so the rules live outside the UI) and adds theme, settings and auth.
@@ -24,11 +25,34 @@ class AppState extends ChangeNotifier {
   bool authReady = false; // true once the stored session has been loaded
   bool get isSignedIn => signedInEmail != null;
 
+  // in-app updates
+  UpdateInfo? update; // non-null when a newer APK is available
+  bool updateDismissed = false;
+  bool get showUpdateBanner => update != null && !updateDismissed;
+
   AppState() {
     servers.addListener(notifyListeners);
     vpn.addListener(notifyListeners);
     _loadSession();
     servers.measureAll(); // real latency to each node
+    checkUpdate();
+  }
+
+  /// Checks the site for a newer version. Returns true if one was found.
+  Future<bool> checkUpdate() async {
+    final found = await UpdateService.check();
+    if (found != null) {
+      update = found;
+      updateDismissed = false;
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  void dismissUpdate() {
+    updateDismissed = true;
+    notifyListeners();
   }
 
   Future<void> _loadSession() async {

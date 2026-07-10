@@ -5,6 +5,7 @@ import 'vpn_service.dart';
 import 'server_model.dart';
 import 'widgets.dart';
 import 'orb.dart';
+import 'update_ui.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenServers;
@@ -44,6 +45,10 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
           _CircleIconButton(icon: Icons.person_rounded, onTap: onOpenProfile),
         ]),
+        if (app.showUpdateBanner) ...[
+          const SizedBox(height: 14),
+          UpdateBanner(info: app.update!, onDismiss: app.dismissUpdate),
+        ],
         const SizedBox(height: 14),
         const Center(child: FadeSlideIn(child: ConnectOrb())),
         const SizedBox(height: 8),

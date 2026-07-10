@@ -9,6 +9,7 @@ import 'servers.dart';
 import 'profile.dart';
 import 'settings.dart';
 import 'login_screen.dart';
+import 'update_ui.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -113,6 +114,7 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   int _tab = 0;
+  bool _mandatoryShown = false;
   void _go(int i) {
     setState(() => _tab = i);
     if (i == 1) AppScope.of(context).servers.measureAll(); // refresh latency
@@ -122,6 +124,14 @@ class _RootShellState extends State<RootShell> {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
+
+    // An important (mandatory) update shows a blocking dialog, once.
+    if (app.update?.mandatory == true && !_mandatoryShown) {
+      _mandatoryShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showMandatoryUpdateDialog(context, app.update!);
+      });
+    }
     final screens = [
       HomeScreen(onOpenServers: () => _go(1), onOpenProfile: () => _go(2)),
       ServersScreen(onDone: () => _go(0)),

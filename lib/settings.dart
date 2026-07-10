@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'state.dart';
 import 'widgets.dart';
+import 'config.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -81,11 +82,48 @@ class SettingsScreen extends StatelessWidget {
           delayMs: 180,
           child: GlassCard(
             child: Column(children: [
-              _info(c, Icons.info_outline_rounded, 'Version', '1.1.0'),
+              _info(c, Icons.info_outline_rounded, 'Version',
+                  'v$kVersionName ($kVersionCode)'),
               Divider(height: 20, color: c.track),
               _info(c, Icons.public_rounded, 'Website', 'jeevvpn.vercel.app'),
               Divider(height: 20, color: c.track),
               _info(c, Icons.favorite_rounded, 'Made for', 'The JeevVPN crew'),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 10),
+        FadeSlideIn(
+          delayMs: 210,
+          child: GlassCard(
+            onTap: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final found = await app.checkUpdate();
+              messenger.showSnackBar(SnackBar(
+                behavior: SnackBarBehavior.floating,
+                content: Text(found
+                    ? 'Update available — see the banner on Home.'
+                    : "You're on the latest version."),
+              ));
+            },
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: kGreen.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(11)),
+                child: const Icon(Icons.system_update_rounded,
+                    size: 20, color: kGreenDeep),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text('Check for updates',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: c.ink,
+                        fontSize: 14.5)),
+              ),
+              Icon(Icons.chevron_right_rounded, color: c.faint),
             ]),
           ),
         ),
