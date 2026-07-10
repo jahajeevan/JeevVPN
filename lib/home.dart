@@ -47,7 +47,7 @@ class HomeScreen extends StatelessWidget {
         ]),
         if (app.showUpdateBanner) ...[
           const SizedBox(height: 14),
-          UpdateBanner(info: app.update!, onDismiss: app.dismissUpdate),
+          UpdateBanner(info: app.availableUpdate!, onDismiss: app.dismissUpdate),
         ],
         const SizedBox(height: 14),
         const Center(child: FadeSlideIn(child: ConnectOrb())),

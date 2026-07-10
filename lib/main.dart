@@ -126,10 +126,10 @@ class _RootShellState extends State<RootShell> {
     final dark = Theme.of(context).brightness == Brightness.dark;
 
     // An important (mandatory) update shows a blocking dialog, once.
-    if (app.update?.mandatory == true && !_mandatoryShown) {
+    if (app.availableUpdate?.mandatory == true && !_mandatoryShown) {
       _mandatoryShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) showMandatoryUpdateDialog(context, app.update!);
+        if (mounted) showMandatoryUpdateDialog(context, app.availableUpdate!);
       });
     }
     final screens = [

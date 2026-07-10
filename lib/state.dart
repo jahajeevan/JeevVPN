@@ -26,9 +26,9 @@ class AppState extends ChangeNotifier {
   bool get isSignedIn => signedInEmail != null;
 
   // in-app updates
-  UpdateInfo? update; // non-null when a newer APK is available
+  UpdateInfo? availableUpdate; // non-null when a newer APK is available
   bool updateDismissed = false;
-  bool get showUpdateBanner => update != null && !updateDismissed;
+  bool get showUpdateBanner => availableUpdate != null && !updateDismissed;
 
   AppState() {
     servers.addListener(notifyListeners);
@@ -42,7 +42,7 @@ class AppState extends ChangeNotifier {
   Future<bool> checkUpdate() async {
     final found = await UpdateService.check();
     if (found != null) {
-      update = found;
+      availableUpdate = found;
       updateDismissed = false;
       notifyListeners();
       return true;
