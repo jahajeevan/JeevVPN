@@ -70,7 +70,7 @@ const List<ServerModel> kServers = [
     port: 443,
     publicIp: '52.140.121.205',
     shareLink:
-        'trojan://2f787001ba855030db138fbaca39840c@52-140-121-205.sslip.io:443?security=tls&sni=52-140-121-205.sslip.io&allowInsecure=1&type=tcp#JeevVPN-India',
+        'trojan://2f787001ba855030db138fbaca39840c@52-140-121-205.sslip.io:443?security=tls&sni=52-140-121-205.sslip.io&type=tcp#JeevVPN-India',
     recommended: true,
     online: true,
     ping: 16,
