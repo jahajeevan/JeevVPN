@@ -69,8 +69,10 @@ const List<ServerModel> kServers = [
     country: 'South Korea',
     city: 'Seoul',
     flag: '🇰🇷',
-    host: '', // TODO(v3): provision Trojan on the Korea VM, then add shareLink
+    host: '72-155-88-152.sslip.io',
     port: 443,
+    shareLink:
+        'trojan://cbe6d1f40a051a12726dddafb8e39c61@72-155-88-152.sslip.io:443?security=tls&sni=72-155-88-152.sslip.io&allowInsecure=1&type=tcp#JeevVPN-Korea',
     recommended: false,
     online: true,
     ping: 74,
