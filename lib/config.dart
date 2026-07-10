@@ -8,8 +8,8 @@ const String kApiBase = 'https://jeevvpn.vercel.app';
 /// the `+N` build number in pubspec.yaml — the in-app updater compares it
 /// against the manifest at [kVersionManifestUrl] to decide if a newer APK
 /// exists.
-const int kVersionCode = 9;
-const String kVersionName = '3.4.0';
+const int kVersionCode = 10;
+const String kVersionName = '3.4.1';
 
 /// Update manifest (JSON) hosted on the site. Shape:
 /// { "versionCode": 9, "versionName": "3.4.0", "apkUrl": "...",
