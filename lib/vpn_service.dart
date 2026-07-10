@@ -139,16 +139,14 @@ class VpnService extends ChangeNotifier {
       routing['rules'] = rules;
       cfg['routing'] = routing;
 
-      // Ensure name resolution works inside the tunnel. Without a DNS block the
-      // engine can leave apps unable to resolve domains — the tunnel is up but
-      // "nothing loads". Resolve through reliable public resolvers (queries go
-      // over the tunnel, so they don't leak).
-      if (cfg['dns'] == null) {
-        cfg['dns'] = {
-          'servers': ['1.1.1.1', '8.8.8.8', 'localhost'],
-          'queryStrategy': 'UseIP',
-        };
-      }
+      // Resolve names through a clean resolver inside the tunnel. The engine
+      // defaults to 8.8.8.8, which some ISPs hijack/poison — that alone can make
+      // pages fail to load even when the tunnel itself is up. Force Cloudflare
+      // first (queries ride the tunnel, so they don't leak or get tampered).
+      cfg['dns'] = {
+        'servers': ['1.1.1.1', '1.0.0.1', '8.8.8.8'],
+        'queryStrategy': 'UseIP',
+      };
 
       return jsonEncode(cfg);
     } catch (_) {
