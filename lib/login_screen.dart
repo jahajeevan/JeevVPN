@@ -130,13 +130,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_step == 0 ? 'Create your account' : 'Verify your email',
+                          Text(_step == 0 ? 'Sign in to JeevVPN' : 'Verify your email',
                               style: display(20,
                                   weight: FontWeight.w700, color: c.ink)),
                           const SizedBox(height: 6),
                           Text(
                               _step == 0
-                                  ? "Sign in with your email. We'll send you a one-time code to get started."
+                                  ? "Enter your email and we'll send a one-time code. Already have an account? Just sign in — new here, and it's created automatically."
                                   : 'Enter the 6-digit code sent to $_email.',
                               style: TextStyle(color: c.sub, fontSize: 13.5)),
                           const SizedBox(height: 20),

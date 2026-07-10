@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
@@ -75,10 +76,9 @@ class VpnService extends ChangeNotifier {
         return;
       }
       if (g != _gen) return;
-      final parser = FlutterV2ray.parseFromURL(server.shareLink);
       await _v2ray.startV2Ray(
         remark: 'JeevVPN · ${server.name}',
-        config: parser.getFullConfiguration(),
+        config: _buildConfig(server),
         blockedApps: null,
         bypassSubnets: null,
         proxyOnly: false,
@@ -91,6 +91,58 @@ class VpnService extends ChangeNotifier {
         errorText = 'Could not start the tunnel. $e';
         notifyListeners();
       }
+    }
+  }
+
+  /// Builds the Xray config from the server's share link, then blocks QUIC
+  /// (UDP/443). Instagram, YouTube etc. try HTTP/3 over QUIC first; if that
+  /// stalls in the tunnel everything crawls. Dropping UDP/443 makes apps fall
+  /// back to TCP instantly — the same trick our sing-box setup used.
+  String _buildConfig(ServerModel server) {
+    final parser = FlutterV2ray.parseFromURL(server.shareLink);
+    try {
+      final cfg =
+          jsonDecode(parser.getFullConfiguration()) as Map<String, dynamic>;
+
+      // Enable sniffing so traffic is routed by real domain (more reliable for
+      // apps like Instagram than raw-IP routing).
+      final inbounds = ((cfg['inbounds'] as List?) ?? <dynamic>[]).toList();
+      if (inbounds.isNotEmpty && inbounds.first is Map) {
+        (inbounds.first as Map)['sniffing'] = {
+          'enabled': true,
+          'destOverride': ['http', 'tls'],
+          'routeOnly': false,
+        };
+      }
+      cfg['inbounds'] = inbounds;
+
+      // Ensure a blackhole outbound exists to drop the QUIC traffic.
+      final outbounds =
+          ((cfg['outbounds'] as List?) ?? <dynamic>[]).toList();
+      final hasBlackhole = outbounds.any((o) =>
+          o is Map && (o['tag'] == 'blackhole' || o['protocol'] == 'blackhole'));
+      if (!hasBlackhole) {
+        outbounds.add({'tag': 'blackhole', 'protocol': 'blackhole'});
+      }
+      cfg['outbounds'] = outbounds;
+
+      // Prepend a rule sending UDP/443 (QUIC) to the blackhole.
+      final routing = ((cfg['routing'] as Map?)?.cast<String, dynamic>()) ??
+          <String, dynamic>{};
+      final rules = ((routing['rules'] as List?) ?? <dynamic>[]).toList();
+      rules.insert(0, {
+        'type': 'field',
+        'port': 443,
+        'network': 'udp',
+        'outboundTag': 'blackhole',
+      });
+      routing['rules'] = rules;
+      cfg['routing'] = routing;
+
+      return jsonEncode(cfg);
+    } catch (_) {
+      // If anything about the template changes, fall back to the raw config.
+      return parser.getFullConfiguration();
     }
   }
 
