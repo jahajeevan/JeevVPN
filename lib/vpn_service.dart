@@ -94,54 +94,112 @@ class VpnService extends ChangeNotifier {
     }
   }
 
-  /// Builds the Xray config from the server's share link, then blocks QUIC
-  /// (UDP/443). Instagram, YouTube etc. try HTTP/3 over QUIC first; if that
-  /// stalls in the tunnel everything crawls. Dropping UDP/443 makes apps fall
-  /// back to TCP instantly — the same trick our sing-box setup used.
+  /// Builds a correct full-device Xray config from the server's share link.
+  ///
+  /// The TLS handshake was fine ("Protected") but no traffic flowed. Root
+  /// causes fixed here:
+  ///  - IPv6 black-hole: our servers are IPv4-only, but modern Android prefers
+  ///    IPv6 (AAAA) → those connections die. Force IPv4-only DNS + direct.
+  ///  - DNS: hijack the tunnel's DNS to Xray's resolver (over the proxy) so
+  ///    names actually resolve inside the tunnel.
+  ///  - Sniffing on: route by real domain (TLS SNI / HTTP host / QUIC).
+  ///  - No UDP reject: Trojan carries UDP fine — send everything to the proxy,
+  ///    keep LAN/private ranges direct.
   String _buildConfig(ServerModel server) {
     final parser = FlutterV2ray.parseFromURL(server.shareLink);
     try {
       final cfg =
           jsonDecode(parser.getFullConfiguration()) as Map<String, dynamic>;
+      // Korea uses a link with allowInsecure=1; India has a valid cert.
+      final insecure = server.shareLink.contains('allowInsecure=1');
 
-      // Enable sniffing so traffic is routed by real domain (more reliable for
-      // apps like Instagram than raw-IP routing).
+      // ── inbound: keep the plugin's socks inbound (tun2socks feeds it); turn
+      //    on sniffing and allow UDP. ──
       final inbounds = ((cfg['inbounds'] as List?) ?? <dynamic>[]).toList();
+      String inboundTag = 'socks-in';
       if (inbounds.isNotEmpty && inbounds.first is Map) {
-        (inbounds.first as Map)['sniffing'] = {
+        final inb = inbounds.first as Map;
+        inboundTag = (inb['tag'] as String?) ?? inboundTag;
+        inb['sniffing'] = {
           'enabled': true,
-          'destOverride': ['http', 'tls'],
+          'destOverride': ['http', 'tls', 'quic'],
           'routeOnly': false,
         };
+        final s = (inb['settings'] as Map?) ?? <String, dynamic>{};
+        s['udp'] = true;
+        inb['settings'] = s;
       }
       cfg['inbounds'] = inbounds;
 
-      // Ensure a blackhole outbound exists to drop the QUIC traffic.
+      // ── outbounds: proxy(trojan) first — fix its TLS; ensure direct/block/dns. ──
       final outbounds =
           ((cfg['outbounds'] as List?) ?? <dynamic>[]).toList();
-      final hasBlackhole = outbounds.any((o) =>
-          o is Map && (o['tag'] == 'blackhole' || o['protocol'] == 'blackhole'));
-      if (!hasBlackhole) {
-        outbounds.add({'tag': 'blackhole', 'protocol': 'blackhole'});
+      String proxyTag = 'proxy';
+      if (outbounds.isNotEmpty && outbounds.first is Map) {
+        final proxy = outbounds.first as Map;
+        proxyTag = (proxy['tag'] as String?) ?? 'proxy';
+        final ss = (proxy['streamSettings'] as Map?) ?? <String, dynamic>{};
+        final tls = (ss['tlsSettings'] as Map?) ?? <String, dynamic>{};
+        tls['allowInsecure'] = insecure;
+        ss['tlsSettings'] = tls;
+        proxy['streamSettings'] = ss;
+      }
+      for (final o in outbounds) {
+        if (o is Map && (o['protocol'] == 'freedom' || o['tag'] == 'direct')) {
+          final s = (o['settings'] as Map?) ?? <String, dynamic>{};
+          s['domainStrategy'] = 'UseIPv4';
+          o['settings'] = s;
+        }
+      }
+      if (!outbounds.any((o) => o is Map && o['protocol'] == 'blackhole')) {
+        outbounds.add({'tag': 'block', 'protocol': 'blackhole'});
+      }
+      if (!outbounds.any((o) => o is Map && o['protocol'] == 'dns')) {
+        outbounds.add({'tag': 'dns-out', 'protocol': 'dns'});
       }
       cfg['outbounds'] = outbounds;
 
-      // Prepend a rule sending UDP/443 (QUIC) to the blackhole.
-      final routing = ((cfg['routing'] as Map?)?.cast<String, dynamic>()) ??
-          <String, dynamic>{};
-      final rules = ((routing['rules'] as List?) ?? <dynamic>[]).toList();
-      rules.insert(0, {
-        'type': 'field',
-        'port': 443,
-        'network': 'udp',
-        'outboundTag': 'blackhole',
-      });
-      routing['rules'] = rules;
-      cfg['routing'] = routing;
+      // ── DNS: IPv4-only over the proxy (kills the IPv6 black-hole). ──
+      cfg['dns'] = {
+        'servers': ['https://1.1.1.1/dns-query', 'https://8.8.8.8/dns-query'],
+        'queryStrategy': 'UseIPv4',
+      };
+
+      // ── routing: hijack DNS, keep LAN direct, send everything else to the
+      //    proxy. No UDP reject. ──
+      cfg['routing'] = {
+        'domainStrategy': 'IPIfNonMatch',
+        'rules': [
+          {
+            'type': 'field',
+            'inboundTag': [inboundTag],
+            'port': 53,
+            'outboundTag': 'dns-out',
+          },
+          {
+            'type': 'field',
+            'ip': [
+              '10.0.0.0/8',
+              '172.16.0.0/12',
+              '192.168.0.0/16',
+              '127.0.0.0/8',
+              '::1/128',
+              'fc00::/7',
+              'fe80::/10',
+            ],
+            'outboundTag': 'direct',
+          },
+          {
+            'type': 'field',
+            'network': 'tcp,udp',
+            'outboundTag': proxyTag,
+          },
+        ],
+      };
 
       return jsonEncode(cfg);
     } catch (_) {
-      // If anything about the template changes, fall back to the raw config.
+      // If the template changes shape, fall back to the raw config.
       return parser.getFullConfiguration();
     }
   }
