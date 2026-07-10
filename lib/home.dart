@@ -89,7 +89,11 @@ class HomeScreen extends StatelessWidget {
             Expanded(
                 child: _StatTile(
                     label: 'VPN IP',
-                    value: vpn.isConnected ? '52.140.121.205' : '—')),
+                    value: vpn.isConnected
+                        ? (vpn.activeServer?.publicIp.isNotEmpty == true
+                            ? vpn.activeServer!.publicIp
+                            : app.servers.current.publicIp)
+                        : '—')),
             const SizedBox(width: 12),
             Expanded(
                 child: _StatTile(
@@ -100,7 +104,7 @@ class HomeScreen extends StatelessWidget {
             Expanded(
                 child: _StatTile(
                     label: 'Ping',
-                    value: vpn.isConnected ? '${vpn.livePing} ms' : '—')),
+                    value: pingText(app.servers.pingFor(app.servers.current.id)))),
           ]),
         ),
         const SizedBox(height: 14),

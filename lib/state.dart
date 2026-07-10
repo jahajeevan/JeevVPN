@@ -28,6 +28,7 @@ class AppState extends ChangeNotifier {
     servers.addListener(notifyListeners);
     vpn.addListener(notifyListeners);
     _loadSession();
+    servers.measureAll(); // real latency to each node
   }
 
   Future<void> _loadSession() async {

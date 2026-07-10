@@ -103,6 +103,7 @@ class ServersScreen extends StatelessWidget {
                 node: sm.servers[i],
                 selected: sm.current.id == sm.servers[i].id,
                 locked: sm.locked,
+                ping: sm.pingFor(sm.servers[i].id),
                 onTap: () => _choose(context, app, sm.servers[i]),
               ),
             ),
@@ -178,19 +179,40 @@ class _ServerRow extends StatelessWidget {
   final ServerModel node;
   final bool selected;
   final bool locked;
+  final int? ping;
   final VoidCallback onTap;
   const _ServerRow(
       {required this.node,
       required this.selected,
       required this.locked,
+      required this.ping,
       required this.onTap});
+
+  // Real-latency → signal fraction + colour + label.
+  double get _signal {
+    if (ping == null || ping! < 0) return 0.0;
+    return (1 - (ping! / 300.0)).clamp(0.12, 1.0);
+  }
+
+  Color get _signalColor {
+    if (ping == null || ping! < 0) return const Color(0xFFE5484D);
+    if (ping! < 90) return kGreen;
+    if (ping! < 200) return const Color(0xFFEAA23B);
+    return const Color(0xFFE5484D);
+  }
+
+  String get _signalLabel {
+    if (ping == null) return 'measuring…';
+    if (ping! < 0) return 'unreachable';
+    if (ping! < 90) return 'Excellent';
+    if (ping! < 200) return 'Good';
+    return 'Fair';
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final barColor = node.load < 0.4
-        ? kGreen
-        : (node.load < 0.7 ? const Color(0xFFEAA23B) : const Color(0xFFE5484D));
+    final barColor = _signalColor;
     return GlassCard(
       onTap: onTap,
       tint: selected ? kGreen.withOpacity(c.dark ? 0.12 : 0.14) : null,
@@ -249,15 +271,16 @@ class _ServerRow extends StatelessWidget {
                   Row(children: [
                     SizedBox(
                         width: 80,
-                        child: MiniBar(value: node.load, color: barColor)),
+                        child: MiniBar(value: _signal, color: barColor)),
                     const SizedBox(width: 8),
-                    Text('${(node.load * 100).round()}% load',
+                    Text(_signalLabel,
                         style: TextStyle(fontSize: 11, color: c.faint)),
                   ]),
                 ]),
           ),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${node.ping}', style: mono(15, color: c.ink)),
+            Text(ping == null ? '…' : (ping! < 0 ? '—' : '$ping'),
+                style: mono(15, color: c.ink)),
             Text('ms', style: TextStyle(fontSize: 10, color: c.faint)),
           ]),
         ]),

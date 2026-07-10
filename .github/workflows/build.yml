@@ -43,11 +43,16 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Build APK (arm64 debug — small & installable)
-        run: flutter build apk --debug --target-platform android-arm64
+      - name: Use a stable debug signing key (same signature every build → upgrades install cleanly)
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
+      - name: Build APK (arm64 release — smaller; signed with the stable debug key)
+        run: flutter build apk --release --target-platform android-arm64
 
       - name: Rename
-        run: cp build/app/outputs/flutter-apk/app-debug.apk JeevVPN.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk JeevVPN.apk
 
       - uses: actions/upload-artifact@v4
         with:

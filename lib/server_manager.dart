@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'server_model.dart';
 
@@ -20,6 +21,35 @@ class ServerManager extends ChangeNotifier {
   bool locked = false;
   int cooldownRemaining = 0;
   Timer? _cooldown;
+
+  /// Real measured latency per server id (ms). -1 = unreachable, absent = not
+  /// measured yet. Measured with a real TCP handshake to host:port.
+  final Map<String, int> pings = {};
+  final Set<String> _measuring = {};
+
+  int? pingFor(String id) => pings[id];
+
+  Future<void> measureAll() async {
+    await Future.wait(servers.map(measurePing));
+  }
+
+  Future<void> measurePing(ServerModel s) async {
+    if (_measuring.contains(s.id)) return;
+    _measuring.add(s.id);
+    final sw = Stopwatch()..start();
+    try {
+      final socket = await Socket.connect(s.host, s.port,
+          timeout: const Duration(seconds: 4));
+      sw.stop();
+      socket.destroy();
+      pings[s.id] = sw.elapsedMilliseconds;
+    } catch (_) {
+      pings[s.id] = -1;
+    } finally {
+      _measuring.remove(s.id);
+      notifyListeners();
+    }
+  }
 
   /// Attempt to switch to [s].
   /// Returns a result the UI can react to (lock message vs. success).

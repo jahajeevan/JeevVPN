@@ -113,7 +113,10 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   int _tab = 0;
-  void _go(int i) => setState(() => _tab = i);
+  void _go(int i) {
+    setState(() => _tab = i);
+    if (i == 1) AppScope.of(context).servers.measureAll(); // refresh latency
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +133,14 @@ class _RootShellState extends State<RootShell> {
       body: Stack(children: [
         Positioned.fill(
             child: AuroraBackground(active: app.vpn.isConnected, dark: dark)),
-        Positioned.fill(child: IndexedStack(index: _tab, children: screens)),
+        // Aurora fills the whole screen (behind the status bar), but the
+        // content respects the safe area so it never overlaps the status bar.
+        Positioned.fill(
+          child: SafeArea(
+            bottom: false,
+            child: IndexedStack(index: _tab, children: screens),
+          ),
+        ),
       ]),
       bottomNavigationBar: GlassNavBar(index: _tab, onTap: _go),
     );
