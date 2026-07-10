@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'server_model.dart';
 
 /// Owns the server list, the current selection, and the anti-spam switching
@@ -14,8 +15,32 @@ class ServerManager extends ChangeNotifier {
   static const int switchLimit = 2; // switches allowed before a lock
   static const int cooldownSeconds = 40;
 
+  static const String _kServerKey = 'jeev_server_id';
   final List<ServerModel> servers = kServers;
   ServerModel current = kServers.first;
+
+  /// Restore the last-selected location across launches.
+  Future<void> restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getString(_kServerKey);
+      if (id != null) {
+        for (final s in servers) {
+          if (s.id == id) {
+            current = s;
+            break;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kServerKey, current.id);
+    } catch (_) {}
+  }
 
   int _switchCount = 0;
   bool locked = false;
@@ -61,6 +86,7 @@ class ServerManager extends ChangeNotifier {
       return SwitchResult.unchanged;
     }
     current = s;
+    _persist();
     _switchCount++;
     if (_switchCount >= switchLimit) {
       _startCooldown();

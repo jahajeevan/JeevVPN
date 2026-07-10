@@ -357,8 +357,17 @@ class Sparkline extends StatelessWidget {
 class _SparkPainter extends CustomPainter {
   final List<double> d;
   final Color color;
-  _SparkPainter(this.d, this.color);
-  double _y(Size s, int i) => s.height * (1 - d[i].clamp(0.0, 1.0) * 0.9) - 2;
+  final double _norm; // auto-scale to the recent peak so any speed shows
+  _SparkPainter(this.d, this.color)
+      : _norm = (() {
+          double m = 0;
+          for (final v in d) {
+            if (v > m) m = v;
+          }
+          return m < 0.001 ? 1.0 : m;
+        })();
+  double _y(Size s, int i) =>
+      s.height * (1 - (d[i] / _norm).clamp(0.0, 1.0) * 0.9) - 2;
   @override
   void paint(Canvas canvas, Size size) {
     final n = d.length;

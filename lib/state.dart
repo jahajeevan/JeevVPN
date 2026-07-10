@@ -33,7 +33,16 @@ class AppState extends ChangeNotifier {
   AppState() {
     servers.addListener(notifyListeners);
     vpn.addListener(notifyListeners);
-    _loadSession();
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    await _loadSession();
+    await servers.restore(); // last selected location
+    vpn.activeServer = servers.current;
+    // Attach the engine listener now, so if Android kept the tunnel alive
+    // while the app was killed, reopening re-syncs the UI to "connected".
+    await vpn.init();
     servers.measureAll(); // real latency to each node
     checkUpdate();
   }
