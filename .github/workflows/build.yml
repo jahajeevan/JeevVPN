@@ -48,11 +48,11 @@ jobs:
           mkdir -p ~/.android
           cp ci/debug.keystore ~/.android/debug.keystore
 
-      - name: Build APK (arm64 release — smaller; signed with the stable debug key)
-        run: flutter build apk --release --target-platform android-arm64
+      - name: Build APK (per-ABI release split — arm64 only, ~50 MB, signed with the stable debug key)
+        run: flutter build apk --release --split-per-abi
 
-      - name: Rename
-        run: cp build/app/outputs/flutter-apk/app-release.apk JeevVPN.apk
+      - name: Rename (ship the arm64 split)
+        run: cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk JeevVPN.apk
 
       - uses: actions/upload-artifact@v4
         with:
