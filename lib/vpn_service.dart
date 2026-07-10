@@ -139,6 +139,17 @@ class VpnService extends ChangeNotifier {
       routing['rules'] = rules;
       cfg['routing'] = routing;
 
+      // Ensure name resolution works inside the tunnel. Without a DNS block the
+      // engine can leave apps unable to resolve domains — the tunnel is up but
+      // "nothing loads". Resolve through reliable public resolvers (queries go
+      // over the tunnel, so they don't leak).
+      if (cfg['dns'] == null) {
+        cfg['dns'] = {
+          'servers': ['1.1.1.1', '8.8.8.8', 'localhost'],
+          'queryStrategy': 'UseIP',
+        };
+      }
+
       return jsonEncode(cfg);
     } catch (_) {
       // If anything about the template changes, fall back to the raw config.
