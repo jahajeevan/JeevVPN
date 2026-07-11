@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'theme.dart';
 import 'state.dart';
 import 'widgets.dart';
@@ -22,7 +23,7 @@ class ProfileScreen extends StatelessWidget {
           child: GlassCard(
             blur: 14,
             child: Row(children: [
-              const _Avatar(),
+              _EditableAvatar(app: app),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -171,24 +172,146 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar();
+/// Tappable account avatar with a small camera badge. Tapping opens a sheet to
+/// pick a photo from the gallery or camera, or remove the current one.
+class _EditableAvatar extends StatelessWidget {
+  final AppState app;
+  const _EditableAvatar({required this.app});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      padding: const EdgeInsets.all(2.5),
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: SweepGradient(colors: [kGreen, kAqua, kMint, kGreen]),
-      ),
-      child: const DecoratedBox(
-        decoration:
-            BoxDecoration(shape: BoxShape.circle, color: Color(0xFF0B0F17)),
-        child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+    return GestureDetector(
+      onTap: () => _showAvatarSheet(context, app),
+      child: SizedBox(
+        width: 60,
+        height: 60,
+        child: Stack(clipBehavior: Clip.none, children: [
+          UserAvatar(bytes: app.avatarBytes, size: 56),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [kGreen, kGreenCore]),
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: AppColors.of(context).dark
+                        ? const Color(0xFF0C1119)
+                        : Colors.white,
+                    width: 2),
+              ),
+              child: const Icon(Icons.camera_alt_rounded,
+                  color: Colors.white, size: 12),
+            ),
+          ),
+        ]),
       ),
     );
+  }
+}
+
+/// Bottom sheet: choose gallery / camera / remove for the profile photo.
+void _showAvatarSheet(BuildContext context, AppState app) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      final c = AppColors.of(ctx);
+      return Container(
+        decoration: BoxDecoration(
+          color: c.dark ? const Color(0xFF0C1119) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        child: SafeArea(
+          top: false,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: c.track, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6, bottom: 6),
+                child: Text('Profile photo',
+                    style: display(18, weight: FontWeight.w700, color: c.ink)),
+              ),
+            ),
+            _avatarOption(ctx, c, Icons.photo_library_rounded,
+                'Choose from gallery', () {
+              Navigator.pop(ctx);
+              _pickAvatar(context, app, ImageSource.gallery);
+            }),
+            _avatarOption(ctx, c, Icons.photo_camera_rounded, 'Take a photo',
+                () {
+              Navigator.pop(ctx);
+              _pickAvatar(context, app, ImageSource.camera);
+            }),
+            if (app.hasAvatar)
+              _avatarOption(ctx, c, Icons.delete_outline_rounded,
+                  'Remove photo', () {
+                Navigator.pop(ctx);
+                app.clearAvatar();
+              }, danger: true),
+          ]),
+        ),
+      );
+    },
+  );
+}
+
+Widget _avatarOption(BuildContext context, AppColors c, IconData icon,
+    String label, VoidCallback onTap,
+    {bool danger = false}) {
+  final color = danger ? const Color(0xFFE5484D) : c.ink;
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+        child: Row(children: [
+          Icon(icon, size: 22, color: danger ? color : kGreenDeep),
+          const SizedBox(width: 16),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w600, fontSize: 15)),
+        ]),
+      ),
+    ),
+  );
+}
+
+/// Picks an image, downscaled to keep it small, and stores it on the account.
+Future<void> _pickAvatar(
+    BuildContext context, AppState app, ImageSource source) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (file == null) return; // user cancelled
+    final bytes = await file.readAsBytes();
+    await app.setAvatar(bytes);
+    messenger.showSnackBar(const SnackBar(
+      behavior: SnackBarBehavior.floating,
+      content: Text('Profile photo updated'),
+    ));
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(
+      behavior: SnackBarBehavior.floating,
+      content: Text("Couldn't set that photo. Try another."),
+    ));
   }
 }
 

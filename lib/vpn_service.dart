@@ -42,15 +42,15 @@ class VpnService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> toggle(ServerModel server) async {
+  Future<void> toggle(ServerModel server, {bool blockQuic = true}) async {
     if (status == VpnStatus.disconnected) {
-      await connect(server);
+      await connect(server, blockQuic: blockQuic);
     } else {
       await disconnect();
     }
   }
 
-  Future<void> connect(ServerModel server) async {
+  Future<void> connect(ServerModel server, {bool blockQuic = true}) async {
     activeServer = server;
     errorText = null;
     _stopping = false;
@@ -76,7 +76,7 @@ class VpnService extends ChangeNotifier {
       if (g != _gen) return;
       await _v2ray.startV2Ray(
         remark: 'JeevVPN · ${server.name}',
-        config: _buildConfig(server),
+        config: _buildConfig(server, blockQuic: blockQuic),
         blockedApps: null,
         bypassSubnets: null,
         proxyOnly: false,
@@ -104,7 +104,7 @@ class VpnService extends ChangeNotifier {
   }
 
   /// Change location: drop the current tunnel, then bring up the new one.
-  Future<void> switchTo(ServerModel server) async {
+  Future<void> switchTo(ServerModel server, {bool blockQuic = true}) async {
     if (!isConnected && !isBusy) {
       activeServer = server;
       notifyListeners();
@@ -112,7 +112,7 @@ class VpnService extends ChangeNotifier {
     }
     await disconnect();
     await Future<void>.delayed(const Duration(milliseconds: 500));
-    await connect(server);
+    await connect(server, blockQuic: blockQuic);
   }
 
   // ── the single source of truth for connection state ──────────────────────
@@ -169,16 +169,23 @@ class VpnService extends ChangeNotifier {
 
   /// Builds a correct full-device Xray config from the server's share link.
   ///
-  /// The TLS handshake was fine ("Protected") but no traffic flowed. Root
-  /// causes fixed here:
-  ///  - IPv6 black-hole: our servers are IPv4-only, but modern Android prefers
-  ///    IPv6 (AAAA) → those connections die. Force IPv4-only DNS + direct.
-  ///  - DNS: hijack the tunnel's DNS to Xray's resolver (over the proxy) so
-  ///    names actually resolve inside the tunnel.
-  ///  - Sniffing on: route by real domain (TLS SNI / HTTP host / QUIC).
-  ///  - No UDP reject: Trojan carries UDP fine — send everything to the proxy,
-  ///    keep LAN/private ranges direct.
-  String _buildConfig(ServerModel server) {
+  /// The tunnel used to report "Protected" while no page, YouTube or Chrome
+  /// would load. The fixes that make the connection actually carry traffic:
+  ///  - Server-side DNS ([routing.domainStrategy] = AsIs): we do NOT resolve
+  ///    names on-device. Sniffing lifts the real domain out of the TLS/HTTP
+  ///    handshake and the exit server resolves it. Local resolution stalling
+  ///    was the #1 cause of "connected but nothing loads".
+  ///  - Robust proxy detection: find the real proxy outbound by protocol
+  ///    (trojan/vless/vmess/…) instead of assuming it's first — a wrong tag
+  ///    sent every packet into a black hole.
+  ///  - Block QUIC (UDP/443) when [blockQuic]: Chrome & YouTube try QUIC first
+  ///    and hang when it half-works through a tunnel. Blocking it forces an
+  ///    instant fallback to TCP/TLS, which Trojan carries reliably.
+  ///  - IPv4-only + LAN-direct: our nodes are IPv4-only, so kill the IPv6
+  ///    (AAAA) black-hole; private ranges stay off the tunnel.
+  ///  - DNS hijack: every port-53 query is answered inside the tunnel (no DNS
+  ///    leak, no reliance on the phone's resolver).
+  String _buildConfig(ServerModel server, {bool blockQuic = true}) {
     final parser = FlutterV2ray.parseFromURL(server.shareLink);
     try {
       final cfg =
@@ -187,15 +194,15 @@ class VpnService extends ChangeNotifier {
       final insecure = server.shareLink.contains('allowInsecure=1');
 
       // ── inbound: keep the plugin's socks inbound (tun2socks feeds it); turn
-      //    on sniffing and allow UDP. ──
+      //    on sniffing so we route by the real domain, and allow UDP. ──
       final inbounds = ((cfg['inbounds'] as List?) ?? <dynamic>[]).toList();
-      String inboundTag = 'socks-in';
-      if (inbounds.isNotEmpty && inbounds.first is Map) {
-        final inb = inbounds.first as Map;
-        inboundTag = (inb['tag'] as String?) ?? inboundTag;
+      for (final inb in inbounds) {
+        if (inb is! Map) continue;
         inb['sniffing'] = {
           'enabled': true,
-          'destOverride': ['http', 'tls', 'quic'],
+          // Recover the domain from TLS SNI / HTTP host so the exit server can
+          // resolve it. QUIC is dropped (see routing) so no need to sniff it.
+          'destOverride': ['http', 'tls'],
           'routeOnly': false,
         };
         final s = (inb['settings'] as Map?) ?? <String, dynamic>{};
@@ -204,25 +211,50 @@ class VpnService extends ChangeNotifier {
       }
       cfg['inbounds'] = inbounds;
 
-      // ── outbounds: proxy(trojan) first — fix its TLS; ensure direct/block/dns. ──
+      // ── outbounds: find the real proxy by protocol; fix its TLS; make sure
+      //    direct/block/dns outbounds exist. ──
       final outbounds =
           ((cfg['outbounds'] as List?) ?? <dynamic>[]).toList();
+      const proxyProtocols = {'trojan', 'vless', 'vmess', 'shadowsocks'};
+      Map? proxy;
+      for (final o in outbounds) {
+        if (o is Map && proxyProtocols.contains(o['protocol'])) {
+          proxy = o;
+          break;
+        }
+      }
+      proxy ??= (outbounds.isNotEmpty && outbounds.first is Map)
+          ? outbounds.first as Map
+          : null;
       String proxyTag = 'proxy';
-      if (outbounds.isNotEmpty && outbounds.first is Map) {
-        final proxy = outbounds.first as Map;
+      if (proxy != null) {
         proxyTag = (proxy['tag'] as String?) ?? 'proxy';
+        proxy['tag'] = proxyTag;
         final ss = (proxy['streamSettings'] as Map?) ?? <String, dynamic>{};
         final tls = (ss['tlsSettings'] as Map?) ?? <String, dynamic>{};
         tls['allowInsecure'] = insecure;
         ss['tlsSettings'] = tls;
         proxy['streamSettings'] = ss;
       }
+      // Freedom/direct outbound → IPv4 only (our nodes have no IPv6). Normalise
+      // its tag to 'direct'; track whether we found one so we don't add a
+      // duplicate (two outbounds sharing a tag can break routing).
+      var hasDirect = false;
       for (final o in outbounds) {
         if (o is Map && (o['protocol'] == 'freedom' || o['tag'] == 'direct')) {
+          o['tag'] = 'direct';
           final s = (o['settings'] as Map?) ?? <String, dynamic>{};
           s['domainStrategy'] = 'UseIPv4';
           o['settings'] = s;
+          hasDirect = true;
         }
+      }
+      if (!hasDirect) {
+        outbounds.add({
+          'tag': 'direct',
+          'protocol': 'freedom',
+          'settings': {'domainStrategy': 'UseIPv4'},
+        });
       }
       if (!outbounds.any((o) => o is Map && o['protocol'] == 'blackhole')) {
         outbounds.add({'tag': 'block', 'protocol': 'blackhole'});
@@ -232,42 +264,56 @@ class VpnService extends ChangeNotifier {
       }
       cfg['outbounds'] = outbounds;
 
-      // ── DNS: IPv4-only over the proxy (kills the IPv6 black-hole). ──
+      // ── DNS: answer the app's hijacked port-53 queries with DoH. DoH egresses
+      //    on :443 (carried through the proxy), so the resolver's own lookups
+      //    never re-match the port-53 rule below — no DNS loop. IPv4 answers
+      //    only (our nodes are v4-only). With routing = AsIs this resolver is
+      //    used only to answer apps, not for every routing decision. ──
       cfg['dns'] = {
         'servers': ['https://1.1.1.1/dns-query', 'https://8.8.8.8/dns-query'],
         'queryStrategy': 'UseIPv4',
       };
 
-      // ── routing: hijack DNS, keep LAN direct, send everything else to the
-      //    proxy. No UDP reject. ──
-      cfg['routing'] = {
-        'domainStrategy': 'IPIfNonMatch',
-        'rules': [
-          {
-            'type': 'field',
-            'inboundTag': [inboundTag],
-            'port': 53,
-            'outboundTag': 'dns-out',
-          },
-          {
-            'type': 'field',
-            'ip': [
-              '10.0.0.0/8',
-              '172.16.0.0/12',
-              '192.168.0.0/16',
-              '127.0.0.0/8',
-              '::1/128',
-              'fc00::/7',
-              'fe80::/10',
-            ],
-            'outboundTag': 'direct',
-          },
-          {
-            'type': 'field',
-            'network': 'tcp,udp',
-            'outboundTag': proxyTag,
-          },
+      // ── routing: AsIs = don't resolve on-device (server resolves). Hijack
+      //    DNS, drop QUIC (forces TCP), keep LAN direct, everything else to the
+      //    proxy. Order matters: DNS and QUIC rules must come before catch-all. ──
+      final rules = <Map<String, dynamic>>[
+        {
+          'type': 'field',
+          'port': 53,
+          'outboundTag': 'dns-out',
+        },
+      ];
+      if (blockQuic) {
+        rules.add({
+          'type': 'field',
+          'network': 'udp',
+          'port': 443,
+          'outboundTag': 'block',
+        });
+      }
+      rules.add({
+        'type': 'field',
+        'ip': [
+          '10.0.0.0/8',
+          '172.16.0.0/12',
+          '192.168.0.0/16',
+          '127.0.0.0/8',
+          '169.254.0.0/16',
+          '::1/128',
+          'fc00::/7',
+          'fe80::/10',
         ],
+        'outboundTag': 'direct',
+      });
+      rules.add({
+        'type': 'field',
+        'network': 'tcp,udp',
+        'outboundTag': proxyTag,
+      });
+      cfg['routing'] = {
+        'domainStrategy': 'AsIs',
+        'rules': rules,
       };
 
       return jsonEncode(cfg);

@@ -3,6 +3,7 @@ import 'theme.dart';
 import 'state.dart';
 import 'widgets.dart';
 import 'config.dart';
+import 'update_ui.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -55,7 +56,7 @@ class SettingsScreen extends StatelessWidget {
                   (v) => app.update(auto: v)),
               Divider(height: 20, color: c.track),
               _toggle(c, Icons.block_rounded, 'Block QUIC / UDP',
-                  'Beats DPI throttling on campus Wi-Fi', app.blockQuic,
+                  'Forces reliable TCP so pages & videos load', app.blockQuic,
                   (v) => app.update(quic: v)),
             ]),
           ),
@@ -98,12 +99,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () async {
               final messenger = ScaffoldMessenger.of(context);
               final found = await app.checkUpdate();
-              messenger.showSnackBar(SnackBar(
-                behavior: SnackBarBehavior.floating,
-                content: Text(found
-                    ? 'Update available — see the banner on Home.'
-                    : "You're on the latest version."),
-              ));
+              if (found && context.mounted && app.availableUpdate != null) {
+                showWhatsNewSheet(context, app.availableUpdate!);
+              } else {
+                messenger.showSnackBar(const SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  content: Text("You're on the latest version."),
+                ));
+              }
             },
             child: Row(children: [
               Container(

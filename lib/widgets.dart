@@ -1,7 +1,55 @@
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'theme.dart';
+
+/// Circular account avatar with the brand gradient ring. Shows [bytes] as the
+/// photo when present, otherwise [fallbackIcon]. Reused on Profile + Home so
+/// the user's photo appears everywhere it makes sense.
+class UserAvatar extends StatelessWidget {
+  final Uint8List? bytes;
+  final double size;
+  final double ring;
+  final IconData fallbackIcon;
+  const UserAvatar({
+    super.key,
+    this.bytes,
+    this.size = 56,
+    this.ring = 2.5,
+    this.fallbackIcon = Icons.person_rounded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inner = size - ring * 2;
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(ring),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: SweepGradient(colors: [kGreen, kAqua, kMint, kGreen]),
+      ),
+      child: ClipOval(
+        child: bytes != null
+            ? Image.memory(
+                bytes!,
+                width: inner,
+                height: inner,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              )
+            : DecoratedBox(
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: Color(0xFF0B0F17)),
+                child: Icon(fallbackIcon,
+                    color: Colors.white, size: inner * 0.5),
+              ),
+      ),
+    );
+  }
+}
 
 /// Frosted glass surface. [blur] > 0 enables a real backdrop blur (use
 /// sparingly — heavy in long lists). Optional [onTap] adds a clipped ripple.

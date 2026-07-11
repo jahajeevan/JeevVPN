@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'server_manager.dart';
@@ -23,11 +25,14 @@ class AppState extends ChangeNotifier {
   static const String _kEmailKey = 'jeev_signed_in_email';
   static const String _kNameKey = 'jeev_name';
   static const String _kAgeKey = 'jeev_age';
+  static const String _kAvatarKey = 'jeev_avatar'; // base64 of a small JPEG
   String? signedInEmail;
   String? signedInName;
   int? signedInAge;
+  Uint8List? avatarBytes; // profile photo, null = use the default avatar
   bool authReady = false; // true once the stored session has been loaded
   bool get isSignedIn => signedInEmail != null;
+  bool get hasAvatar => avatarBytes != null;
 
   // in-app updates
   UpdateInfo? availableUpdate; // non-null when a newer APK is available
@@ -76,6 +81,12 @@ class AppState extends ChangeNotifier {
         signedInEmail = saved;
         signedInName = prefs.getString(_kNameKey);
         signedInAge = prefs.getInt(_kAgeKey);
+        final avatar = prefs.getString(_kAvatarKey);
+        if (avatar != null && avatar.isNotEmpty) {
+          try {
+            avatarBytes = base64Decode(avatar);
+          } catch (_) {}
+        }
       }
     } catch (_) {
       // ignore — start signed out
@@ -84,8 +95,29 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Set (or replace) the profile photo. Pass null to keep the current one;
+  /// use [clearAvatar] to remove it.
+  Future<void> setAvatar(Uint8List bytes) async {
+    avatarBytes = bytes;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kAvatarKey, base64Encode(bytes));
+    } catch (_) {}
+  }
+
+  Future<void> clearAvatar() async {
+    avatarBytes = null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kAvatarKey);
+    } catch (_) {}
+  }
+
   /// Connect / disconnect using the currently selected location.
-  Future<void> toggleConnection() => vpn.toggle(servers.current);
+  Future<void> toggleConnection() =>
+      vpn.toggle(servers.current, blockQuic: blockQuic);
 
   Future<void> signIn(String email, {String? name, int? age}) async {
     signedInEmail = email.trim();
@@ -114,12 +146,14 @@ class AppState extends ChangeNotifier {
     signedInEmail = null;
     signedInName = null;
     signedInAge = null;
+    avatarBytes = null;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kEmailKey);
       await prefs.remove(_kNameKey);
       await prefs.remove(_kAgeKey);
+      await prefs.remove(_kAvatarKey);
     } catch (_) {}
   }
 
@@ -133,10 +167,15 @@ class AppState extends ChangeNotifier {
       {bool? kill, bool? auto, bool? quic, bool? notif, bool? haptic}) {
     if (kill != null) killSwitch = kill;
     if (auto != null) autoConnect = auto;
+    final quicChanged = quic != null && quic != blockQuic;
     if (quic != null) blockQuic = quic;
     if (notif != null) protectedNotif = notif;
     if (haptic != null) haptics = haptic;
     notifyListeners();
+    // QUIC blocking is baked into the tunnel config, so re-apply it live.
+    if (quicChanged && vpn.isConnected) {
+      vpn.switchTo(servers.current, blockQuic: blockQuic);
+    }
   }
 
   @override

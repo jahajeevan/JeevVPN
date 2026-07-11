@@ -1,0 +1,7 @@
+{
+  "versionCode": 12,
+  "versionName": "3.5.0",
+  "apkUrl": "https://github.com/jahajeevan/JeevVPN/releases/latest/download/JeevVPN.apk",
+  "mandatory": false,
+  "notes": "Rock-solid connections — fixed \"connected but no internet\" so pages, YouTube and Chrome load reliably\nBlock-QUIC now truly forces fast, dependable TCP through the tunnel\nSmarter DNS: the exit server resolves names, so sites stop hanging\nSet a profile photo from your gallery or camera\nCleaner in-app updates — see exactly what's new before you download"
+}

@@ -22,7 +22,9 @@ class ServersScreen extends StatelessWidget {
         ));
         return;
       case SwitchResult.switched:
-        if (app.vpn.isConnected) app.vpn.switchTo(node);
+        if (app.vpn.isConnected) {
+          app.vpn.switchTo(node, blockQuic: app.blockQuic);
+        }
         onDone();
         return;
       case SwitchResult.unchanged:

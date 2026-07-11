@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write # needed to publish the GitHub Release (public APK + manifest)
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -59,3 +62,25 @@ jobs:
           name: JeevVPN-apk
           path: JeevVPN.apk
           if-no-files-found: error
+
+      # ── Publish a public release so the in-app updater has a real download
+      #    URL. The tag is the version from pubspec; app-version.json (the update
+      #    manifest the app polls) rides along on the same release. ──
+      - name: Read version from pubspec
+        id: ver
+        run: |
+          LINE=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          echo "name=${LINE%+*}" >> "$GITHUB_OUTPUT"
+          echo "code=${LINE#*+}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release (public APK + update manifest)
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true # never fail the build if release perms are missing
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.name }}+${{ steps.ver.outputs.code }}
+          name: JeevVPN v${{ steps.ver.outputs.name }}
+          make_latest: true
+          files: |
+            JeevVPN.apk
+            app-version.json

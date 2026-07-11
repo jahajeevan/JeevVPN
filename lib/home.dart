@@ -43,7 +43,14 @@ class HomeScreen extends StatelessWidget {
               icon: c.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               onTap: () => app.toggleThemeQuick(c.dark)),
           const SizedBox(width: 8),
-          _CircleIconButton(icon: Icons.person_rounded, onTap: onOpenProfile),
+          app.hasAvatar
+              ? GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onOpenProfile,
+                  child: UserAvatar(bytes: app.avatarBytes, size: 40, ring: 2),
+                )
+              : _CircleIconButton(
+                  icon: Icons.person_rounded, onTap: onOpenProfile),
         ]),
         if (app.showUpdateBanner) ...[
           const SizedBox(height: 14),
